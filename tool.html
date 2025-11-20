@@ -31,12 +31,12 @@
             background: #fdfdfd;
         }
         img.preview {
-            width: 200px;
+            width: 220px;
             border-radius: 8px;
             margin-bottom: 10px;
             display: block;
         }
-        input, textarea {
+        input {
             width: 100%;
             padding: 10px;
             margin: 8px 0 18px;
@@ -57,13 +57,12 @@
         .download-btn:hover {
             background: #1f7e35;
         }
-        pre {
-            background: #222;
-            color: #0f0;
+
+        .logo-upload {
+            margin-bottom: 25px;
             padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto;
-            margin-top: 20px;
+            background: #eef3ff;
+            border-radius: 10px;
         }
     </style>
 </head>
@@ -74,6 +73,11 @@
 
 <div class="container">
 
+    <div class="logo-upload">
+        <label><b>Upload Logo (applies to ALL images):</b></label>
+        <input type="file" id="logoInput" accept="image/*">
+    </div>
+
     <label><b>Upload Multiple Images:</b></label>
     <input type="file" id="multiInput" accept="image/*" multiple>
 
@@ -83,6 +87,19 @@
 
 
 <script>
+
+let logoImageURL = null;
+
+// Load logo
+document.getElementById("logoInput").onchange = function(e){
+    const file = e.target.files[0];
+    if(file){
+        logoImageURL = URL.createObjectURL(file);
+    }
+};
+
+
+// When images are uploaded
 document.getElementById("multiInput").onchange = function(e){
     const files = e.target.files;
     let html = "";
@@ -96,10 +113,13 @@ document.getElementById("multiInput").onchange = function(e){
             <img src="${url}" class="preview">
             <p><b>${file.name}</b></p>
 
-            <input type="text" placeholder="Item Name" class="item">
             <input type="text" placeholder="Brand" class="brand">
-            <input type="text" placeholder="Color" class="color">
+            <input type="text" placeholder="Product Name" class="item">
+            <input type="text" placeholder="Material / Category" class="category">
+            <input type="text" placeholder="Size (e.g. L, XL, XXL)" class="size">
             <input type="text" placeholder="Price (numbers only)" class="price">
+            <input type="text" placeholder="Length (e.g. 6 ft)" class="length">
+            <input type="text" placeholder="Width (e.g. 4 ft)" class="width">
 
             <button class="download-btn" onclick="createLabeledImage(this, ${i})">
                 Download Image
@@ -112,53 +132,115 @@ document.getElementById("multiInput").onchange = function(e){
 };
 
 
-// ⭐ Create labeled downloadable PNG
+// ⭐ Create labeled image with box + logo
 function createLabeledImage(button, index) {
+
     const block = button.parentElement;
     const img = block.querySelector("img.preview");
     const file = document.getElementById("multiInput").files[index];
 
-    const item = block.querySelector(".item").value || "";
     const brand = block.querySelector(".brand").value || "";
-    const color = block.querySelector(".color").value || "";
+    const item = block.querySelector(".item").value || "";
+    const category = block.querySelector(".category").value || "";
+    const size = block.querySelector(".size").value || "";
     const price = block.querySelector(".price").value || "";
+    const length = block.querySelector(".length").value || "";
+    const width = block.querySelector(".width").value || "";
 
-    const line1 = item;
-    const line2 = brand + (color ? ", " + color : "");
-    const line3 = price ? "Rs " + price : "";
+    const textLines = [
+        brand,
+        item,
+        category,
+        "Size – " + size,
+        "Price – Rs " + price,
+        "Length – " + length,
+        "Width – " + width
+    ];
 
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.src = img.src;
+    const baseImage = new Image();
+    baseImage.crossOrigin = "anonymous";
+    baseImage.src = img.src;
 
-    image.onload = function() {
-        const c = document.createElement("canvas");
-        const ctx = c.getContext("2d");
+    // Load images
+    baseImage.onload = function() {
 
-        let w = image.width;
-        let h = image.height + 200;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
 
-        c.width = w;
-        c.height = h;
+        const w = baseImage.width;
+        const h = baseImage.height;
 
-        ctx.drawImage(image, 0, 0, w, image.height);
+        canvas.width = w;
+        canvas.height = h;
 
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, image.height, w, 200);
+        // draw main image
+        ctx.drawImage(baseImage, 0, 0, w, h);
 
-        ctx.fillStyle = "black";
-        ctx.font = "bold 36px Arial";
+        // ------------- LOGO DRAWING -------------
+        if(logoImageURL){
+            const logo = new Image();
+            logo.crossOrigin = "anonymous";
+            logo.src = logoImageURL;
 
-        ctx.fillText(line1, 30, image.height + 60);
-        ctx.fillText(line2, 30, image.height + 110);
-        ctx.fillText(line3, 30, image.height + 160);
+            logo.onload = function(){
+                const logoW = w * 0.15;
+                const logoH = logo.height * (logoW / logo.width);
 
-        const link = document.createElement("a");
-        link.download = "labeled_" + file.name + ".png";
-        link.href = c.toDataURL();
-        link.click();
+                ctx.drawImage(logo, 40, 40, logoW, logoH);
+
+                drawTextBox();
+            };
+        } else {
+            drawTextBox();
+        }
+
+        // ------------- DRAW TEXT BOX -------------
+        function drawTextBox(){
+
+            const boxWidth = w * 0.33;
+            const lineHeight = 42;
+            const boxHeight = textLines.length * lineHeight + 50;
+
+            const boxX = 40;
+            const boxY = h - boxHeight - 40;
+
+            // semi-transparent glass effect
+            ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
+            ctx.fill();
+
+            ctx.fillStyle = "black";
+            ctx.font = "bold 32px Arial";
+
+            let yText = boxY + 55;
+            textLines.forEach(line => {
+                ctx.fillText(line, boxX + 25, yText);
+                yText += lineHeight;
+            });
+
+            const link = document.createElement("a");
+            link.download = "labeled_" + file.name + ".png";
+            link.href = canvas.toDataURL();
+            link.click();
+        }
     };
 }
+
+
+// Rounded rectangle helper
+CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+    if (w < 2 * r) r = w / 2;
+    if (h < 2 * r) r = h / 2;
+    this.beginPath();
+    this.moveTo(x+r, y);
+    this.arcTo(x+w, y,   x+w, y+h, r);
+    this.arcTo(x+w, y+h, x,   y+h, r);
+    this.arcTo(x,   y+h, x,   y,   r);
+    this.arcTo(x,   y,   x+w, y,   r);
+    this.closePath();
+    return this;
+}
+
 </script>
 
 </body>
