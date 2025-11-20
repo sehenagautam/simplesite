@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Image Label Tool</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            padding: 40px;
+            background: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            font-size: 30px;
+            margin-bottom: 30px;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+        }
+        .image-block {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 10px;
+            background: #fdfdfd;
+        }
+        img.preview {
+            width: 200px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0 18px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+        .download-btn {
+            padding: 10px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 15px;
+        }
+        .download-btn:hover {
+            background: #1f7e35;
+        }
+        pre {
+            background: #222;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1><b>Admin Image Label Tool</b></h1>
+
+<div class="container">
+
+    <label><b>Upload Multiple Images:</b></label>
+    <input type="file" id="multiInput" accept="image/*" multiple>
+
+    <div id="formHolder"></div>
+
+</div>
+
+
+<script>
+document.getElementById("multiInput").onchange = function(e){
+    const files = e.target.files;
+    let html = "";
+
+    for(let i = 0; i < files.length; i++){
+        const file = files[i];
+        const url = URL.createObjectURL(file);
+
+        html += `
+        <div class="image-block">
+            <img src="${url}" class="preview">
+            <p><b>${file.name}</b></p>
+
+            <input type="text" placeholder="Item Name" class="item">
+            <input type="text" placeholder="Brand" class="brand">
+            <input type="text" placeholder="Color" class="color">
+            <input type="text" placeholder="Price (numbers only)" class="price">
+
+            <button class="download-btn" onclick="createLabeledImage(this, ${i})">
+                Download Image
+            </button>
+        </div>
+        `;
+    }
+
+    document.getElementById("formHolder").innerHTML = html;
+};
+
+
+// ⭐ Create labeled downloadable PNG
+function createLabeledImage(button, index) {
+    const block = button.parentElement;
+    const img = block.querySelector("img.preview");
+    const file = document.getElementById("multiInput").files[index];
+
+    const item = block.querySelector(".item").value || "";
+    const brand = block.querySelector(".brand").value || "";
+    const color = block.querySelector(".color").value || "";
+    const price = block.querySelector(".price").value || "";
+
+    const line1 = item;
+    const line2 = brand + (color ? ", " + color : "");
+    const line3 = price ? "Rs " + price : "";
+
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = img.src;
+
+    image.onload = function() {
+        const c = document.createElement("canvas");
+        const ctx = c.getContext("2d");
+
+        let w = image.width;
+        let h = image.height + 200;
+
+        c.width = w;
+        c.height = h;
+
+        ctx.drawImage(image, 0, 0, w, image.height);
+
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, image.height, w, 200);
+
+        ctx.fillStyle = "black";
+        ctx.font = "bold 36px Arial";
+
+        ctx.fillText(line1, 30, image.height + 60);
+        ctx.fillText(line2, 30, image.height + 110);
+        ctx.fillText(line3, 30, image.height + 160);
+
+        const link = document.createElement("a");
+        link.download = "labeled_" + file.name + ".png";
+        link.href = c.toDataURL();
+        link.click();
+    };
+}
+</script>
+
+</body>
+</html>
