@@ -16,7 +16,7 @@
             margin-bottom: 30px;
         }
         .container {
-            max-width: 900px;
+            max-width: 950px;
             margin: auto;
             background: white;
             padding: 25px;
@@ -36,13 +36,17 @@
             margin-bottom: 10px;
             display: block;
         }
-        input {
+        input, textarea {
             width: 100%;
             padding: 10px;
             margin: 8px 0 18px;
             border: 1px solid #ccc;
             border-radius: 6px;
             font-size: 15px;
+        }
+        textarea {
+            min-height: 80px;
+            resize: vertical;
         }
         .download-btn {
             padding: 10px 16px;
@@ -58,6 +62,20 @@
             background: #1f7e35;
         }
 
+        .download-all-btn {
+            padding: 10px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 25px;
+            font-size: 15px;
+        }
+        .download-all-btn:hover {
+            background: #005fcc;
+        }
+
         .logo-upload {
             margin-bottom: 25px;
             padding: 15px;
@@ -65,6 +83,9 @@
             border-radius: 10px;
         }
     </style>
+
+    <!-- JSZip for "Download All" ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 
 <body>
@@ -83,14 +104,16 @@
 
     <div id="formHolder"></div>
 
+    <button id="downloadAllBtn" class="download-all-btn">
+        Download All Labeled Images (ZIP)
+    </button>
 </div>
 
 
 <script>
-
 let logoImageURL = null;
 
-// Load logo
+// ---------------- LOGO ----------------
 document.getElementById("logoInput").onchange = function(e){
     const file = e.target.files[0];
     if(file){
@@ -98,8 +121,7 @@ document.getElementById("logoInput").onchange = function(e){
     }
 };
 
-
-// When images are uploaded
+// -------------- IMAGE UPLOAD --------------
 document.getElementById("multiInput").onchange = function(e){
     const files = e.target.files;
     let html = "";
@@ -120,6 +142,7 @@ document.getElementById("multiInput").onchange = function(e){
             <input type="text" placeholder="Price (numbers only)" class="price">
             <input type="text" placeholder="Length (e.g. 6 ft)" class="length">
             <input type="text" placeholder="Width (e.g. 4 ft)" class="width">
+            <textarea placeholder="Other details / description" class="details"></textarea>
 
             <button class="download-btn" onclick="createLabeledImage(this, ${i})">
                 Download Image
@@ -132,115 +155,380 @@ document.getElementById("multiInput").onchange = function(e){
 };
 
 
-// ⭐ Create labeled image with box + logo
-function createLabeledImage(button, index) {
+// -------------- METADATA COLLECTOR --------------
+function extractMetadata(block, file) {
+    const brand   = block.querySelector(".brand").value || "";
+    const item    = block.querySelector(".item").value || "";
+    const category= block.querySelector(".category").value || "";
+    const size    = block.querySelector(".size").value || "";
+    const price   = block.querySelector(".price").value || "";
+    const length  = block.querySelector(".length").value || "";
+    const width   = block.querySelector(".width").value || "";
+    const details = block.querySelector(".details").value || "";
 
-    const block = button.parentElement;
-    const img = block.querySelector("img.preview");
-    const file = document.getElementById("multiInput").files[index];
-
-    const brand = block.querySelector(".brand").value || "";
-    const item = block.querySelector(".item").value || "";
-    const category = block.querySelector(".category").value || "";
-    const size = block.querySelector(".size").value || "";
-    const price = block.querySelector(".price").value || "";
-    const length = block.querySelector(".length").value || "";
-    const width = block.querySelector(".width").value || "";
-
-    const textLines = [
+    return {
+        filename: file.name,
         brand,
-        item,
+        product: item,
         category,
-        "Size – " + size,
-        "Price – Rs " + price,
-        "Length – " + length,
-        "Width – " + width
-    ];
-
-    const baseImage = new Image();
-    baseImage.crossOrigin = "anonymous";
-    baseImage.src = img.src;
-
-    // Load images
-    baseImage.onload = function() {
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-
-        const w = baseImage.width;
-        const h = baseImage.height;
-
-        canvas.width = w;
-        canvas.height = h;
-
-        // draw main image
-        ctx.drawImage(baseImage, 0, 0, w, h);
-
-        // ------------- LOGO DRAWING -------------
-        if(logoImageURL){
-            const logo = new Image();
-            logo.crossOrigin = "anonymous";
-            logo.src = logoImageURL;
-
-            logo.onload = function(){
-                const logoW = w * 0.15;
-                const logoH = logo.height * (logoW / logo.width);
-
-                ctx.drawImage(logo, 40, 40, logoW, logoH);
-
-                drawTextBox();
-            };
-        } else {
-            drawTextBox();
-        }
-
-        // ------------- DRAW TEXT BOX -------------
-        function drawTextBox(){
-
-            const boxWidth = w * 0.33;
-            const lineHeight = 42;
-            const boxHeight = textLines.length * lineHeight + 50;
-
-            const boxX = 40;
-            const boxY = h - boxHeight - 40;
-
-            // semi-transparent glass effect
-            ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
-            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
-            ctx.fill();
-
-            ctx.fillStyle = "black";
-            ctx.font = "bold 32px Arial";
-
-            let yText = boxY + 55;
-            textLines.forEach(line => {
-                ctx.fillText(line, boxX + 25, yText);
-                yText += lineHeight;
-            });
-
-            const link = document.createElement("a");
-            link.download = "labeled_" + file.name + ".png";
-            link.href = canvas.toDataURL();
-            link.click();
-        }
+        size,
+        price,
+        length,
+        width,
+        details,
+        createdAt: new Date().toISOString()
     };
 }
 
 
-// Rounded rectangle helper
+// -------------- SINGLE DOWNLOAD --------------
+async function createLabeledImage(button, index) {
+    const block = button.parentElement;
+    const file = document.getElementById("multiInput").files[index];
+    if(!file) return;
+
+    const meta = extractMetadata(block, file);
+    const imgEl = block.querySelector("img.preview");
+
+    const canvas = await generateLabeledCanvas(imgEl, meta);
+    const dataURL = canvas.toDataURL("image/png");
+    const dataURLWithMeta = addMetadataToPngDataURL(dataURL, meta);
+
+    downloadDataURL(dataURLWithMeta, "labeled_" + file.name + ".png");
+}
+
+
+// -------------- DOWNLOAD ALL (ZIP) --------------
+document.getElementById("downloadAllBtn").onclick = async function () {
+    const files = document.getElementById("multiInput").files;
+    if (!files.length) {
+        alert("Please upload images first.");
+        return;
+    }
+
+    const blocks = document.querySelectorAll(".image-block");
+    const zip = new JSZip();
+
+    const metaList = Array.from(files).map((file, idx) =>
+        extractMetadata(blocks[idx], file)
+    );
+
+    const canvasList = await Promise.all(
+        metaList.map((meta, idx) => {
+            const imgEl = blocks[idx].querySelector("img.preview");
+            return generateLabeledCanvas(imgEl, meta);
+        })
+    );
+
+    canvasList.forEach((canvas, idx) => {
+        const meta = metaList[idx];
+        const file = files[idx];
+        const dataURL = canvas.toDataURL("image/png");
+        const dataURLWithMeta = addMetadataToPngDataURL(dataURL, meta);
+        const base64Data = dataURLWithMeta.split(",")[1];
+        zip.file("labeled_" + file.name + ".png", base64Data, { base64: true });
+    });
+
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(zipBlob);
+    link.download = "labeled_images.zip";
+    link.click();
+};
+
+
+// -------------- CANVAS GENERATION --------------
+function generateLabeledCanvas(imgEl, meta) {
+    return new Promise((resolve) => {
+        const baseImage = new Image();
+        baseImage.crossOrigin = "anonymous";
+        baseImage.src = imgEl.src;
+
+        baseImage.onload = function() {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+
+            const w = baseImage.width;
+            const h = baseImage.height;
+
+            canvas.width = w;
+            canvas.height = h;
+
+            ctx.drawImage(baseImage, 0, 0, w, h);
+
+            // draw logo first (top-left)
+            const drawLogoAndBox = () => {
+                if (logoImageURL) {
+                    const logo = new Image();
+                    logo.crossOrigin = "anonymous";
+                    logo.src = logoImageURL;
+                    logo.onload = function() {
+                        const logoW = w * 0.16;
+                        const logoH = logo.height * (logoW / logo.width);
+                        ctx.drawImage(logo, 40, 40, logoW, logoH);
+                        drawTextBox(canvas, ctx, w, h, meta);
+                        resolve(canvas);
+                    };
+                } else {
+                    drawTextBox(canvas, ctx, w, h, meta);
+                    resolve(canvas);
+                }
+            };
+
+            drawLogoAndBox();
+        };
+    });
+}
+
+
+// -------------- TEXT BOX (RIGHT SIDE, SMART WRAP) --------------
+function drawTextBox(canvas, ctx, w, h, meta) {
+    // base logical lines
+    const baseLines = [];
+
+    if (meta.brand)   baseLines.push(meta.brand);
+    if (meta.product) baseLines.push(meta.product);
+    if (meta.category)baseLines.push(meta.category);
+    if (meta.size)    baseLines.push("Size – " + meta.size);
+    if (meta.price)   baseLines.push("Price – Rs " + meta.price);
+    if (meta.length)  baseLines.push("Length – " + meta.length);
+    if (meta.width)   baseLines.push("Width – " + meta.width);
+
+    if (meta.details) {
+        baseLines.push(""); // blank line between specs & paragraph
+        const detailLines = meta.details.split(/\r?\n/);
+        detailLines.forEach(l => {
+            if (l.trim()) baseLines.push(l.trim());
+        });
+    }
+
+    const paddingX = 25;
+    const paddingY = 30;
+
+    // font size scales with image width
+    const fontSize = Math.max(18, Math.round(w * 0.023));
+    ctx.font = "bold " + fontSize + "px Arial";
+
+    const boxWidth = Math.min(w * 0.38, 520);
+    const textMaxWidth = boxWidth - paddingX * 2;
+
+    // word-wrap lines
+    const wrappedLines = [];
+    baseLines.forEach(line => {
+        if (line === "") {
+            wrappedLines.push(""); // keep blank line
+        } else {
+            const parts = wrapText(ctx, line, textMaxWidth);
+            wrappedLines.push(...parts);
+        }
+    });
+
+    const lineHeight = fontSize + 8;
+    const boxHeight = paddingY * 2 + lineHeight * wrappedLines.length;
+
+    // RIGHT SIDE placement
+    const boxX = w - boxWidth - 40;
+    const boxY = h - boxHeight - 40;
+
+    // transparent rounded box
+    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
+    ctx.fill();
+
+    // text
+    ctx.fillStyle = "black";
+    ctx.font = "bold " + fontSize + "px Arial";
+    let y = boxY + paddingY + fontSize;
+
+    wrappedLines.forEach(line => {
+        if (line === "") {
+            y += lineHeight; // blank line spacing
+        } else {
+            ctx.fillText(line, boxX + paddingX, y);
+            y += lineHeight;
+        }
+    });
+}
+
+
+// simple word-wrap helper
+function wrapText(ctx, text, maxWidth) {
+    const words = text.split(/\s+/);
+    const lines = [];
+    let line = "";
+
+    words.forEach(word => {
+        const test = line ? line + " " + word : word;
+        const width = ctx.measureText(test).width;
+        if (width > maxWidth && line) {
+            lines.push(line);
+            line = word;
+        } else {
+            line = test;
+        }
+    });
+
+    if (line) lines.push(line);
+    return lines;
+}
+
+
+// -------------- DATA URL DOWNLOAD --------------
+function downloadDataURL(dataURL, filename) {
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = dataURL;
+    link.click();
+}
+
+
+// -------------- PNG METADATA (tEXt chunk, JSON) --------------
+function addMetadataToPngDataURL(dataURL, metadata) {
+    try {
+        const json = JSON.stringify(metadata);
+
+        const base64 = dataURL.split(",")[1];
+        const binary = atob(base64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+
+        // find IEND chunk
+        let offset = 8; // after PNG signature
+        let iendIndex = -1;
+
+        while (offset < bytes.length) {
+            const length = readUint32(bytes, offset);
+            const type = readType(bytes, offset + 4);
+
+            if (type === "IEND") {
+                iendIndex = offset;
+                break;
+            }
+            offset += 8 + length + 4; // len(4) + type(4) + data + crc(4)
+        }
+
+        if (iendIndex < 0) {
+            return dataURL; // invalid PNG
+        }
+
+        const keyword = "label_metadata";
+        const text = keyword + "\0" + json;
+        const encoder = new TextEncoder();
+        const textBytes = encoder.encode(text);
+
+        const chunkTypeBytes = stringToBytes("tEXt");
+        const lengthBytes = uint32ToBytes(textBytes.length);
+
+        const crcInput = new Uint8Array(chunkTypeBytes.length + textBytes.length);
+        crcInput.set(chunkTypeBytes, 0);
+        crcInput.set(textBytes, chunkTypeBytes.length);
+
+        const crcVal = crc32(crcInput);
+        const crcBytes = uint32ToBytes(crcVal);
+
+        const newChunk = new Uint8Array(4 + 4 + textBytes.length + 4);
+        newChunk.set(lengthBytes, 0);
+        newChunk.set(chunkTypeBytes, 4);
+        newChunk.set(textBytes, 8);
+        newChunk.set(crcBytes, 8 + textBytes.length);
+
+        const before = bytes.subarray(0, iendIndex);
+        const after = bytes.subarray(iendIndex);
+
+        const out = new Uint8Array(before.length + newChunk.length + after.length);
+        out.set(before, 0);
+        out.set(newChunk, before.length);
+        out.set(after, before.length + newChunk.length);
+
+        let outBinary = "";
+        for (let i = 0; i < out.length; i++) {
+            outBinary += String.fromCharCode(out[i]);
+        }
+        const outBase64 = btoa(outBinary);
+        return "data:image/png;base64," + outBase64;
+    } catch (e) {
+        console.error("Metadata embedding failed:", e);
+        return dataURL;
+    }
+}
+
+// helpers for PNG parsing
+function readUint32(bytes, offset) {
+    return (
+        (bytes[offset] << 24) |
+        (bytes[offset + 1] << 16) |
+        (bytes[offset + 2] << 8) |
+        (bytes[offset + 3])
+    ) >>> 0;
+}
+
+function readType(bytes, offset) {
+    return String.fromCharCode(
+        bytes[offset],
+        bytes[offset + 1],
+        bytes[offset + 2],
+        bytes[offset + 3]
+    );
+}
+
+function uint32ToBytes(num) {
+    return new Uint8Array([
+        (num >>> 24) & 255,
+        (num >>> 16) & 255,
+        (num >>> 8) & 255,
+        num & 255
+    ]);
+}
+
+function stringToBytes(str) {
+    const arr = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) {
+        arr[i] = str.charCodeAt(i);
+    }
+    return arr;
+}
+
+// CRC32 for PNG chunks
+let crcTable = null;
+function makeCrcTable() {
+    let c;
+    crcTable = [];
+    for (let n = 0; n < 256; n++) {
+        c = n;
+        for (let k = 0; k < 8; k++) {
+            c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        }
+        crcTable[n] = c >>> 0;
+    }
+}
+
+function crc32(arr) {
+    if (!crcTable) makeCrcTable();
+    let crc = 0 ^ (-1);
+    for (let i = 0; i < arr.length; i++) {
+        crc = (crc >>> 8) ^ crcTable[(crc ^ arr[i]) & 0xFF];
+    }
+    return (crc ^ (-1)) >>> 0;
+}
+
+
+// -------------- ROUNDED RECTANGLE --------------
 CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     if (w < 2 * r) r = w / 2;
     if (h < 2 * r) r = h / 2;
     this.beginPath();
-    this.moveTo(x+r, y);
-    this.arcTo(x+w, y,   x+w, y+h, r);
-    this.arcTo(x+w, y+h, x,   y+h, r);
-    this.arcTo(x,   y+h, x,   y,   r);
-    this.arcTo(x,   y,   x+w, y,   r);
+    this.moveTo(x + r, y);
+    this.arcTo(x + w, y,   x + w, y + h, r);
+    this.arcTo(x + w, y + h, x,   y + h, r);
+    this.arcTo(x,   y + h, x,   y,   r);
+    this.arcTo(x,   y,   x + w, y,   r);
     this.closePath();
     return this;
-}
-
+};
 </script>
 
 </body>
