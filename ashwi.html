@@ -71,47 +71,47 @@
 
 <div class="gallery">
 
-<div class="item">
-    <img src="images/ashwi/cabinet.png">
-    <p class="label">Cabinet –  –  – Rs </p>
-    <p class="url-text">images/ashwi/cabinet.png</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/ashwi/cabinet.png">
+        <p class="label">Cabinet –  –  – Rs </p>
+        <p class="url-text">images/ashwi/cabinet.png</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
-<div class="item">
-    <img src="images/ashwi/cupboard.png">
-    <p class="label">Cupboard –  –  – Rs </p>
-    <p class="url-text">images/ashwi/cupboard.png</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/ashwi/cupboard.png">
+        <p class="label">Cupboard –  –  – Rs </p>
+        <p class="url-text">images/ashwi/cupboard.png</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
-<div class="item">
-    <img src="images/ashwi/dressing_table.png">
-    <p class="label">Dressing Table –  –  – Rs </p>
-    <p class="url-text">images/ashwi/dressing_table.png</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/ashwi/dressing_table.png">
+        <p class="label">Dressing Table –  –  – Rs </p>
+        <p class="url-text">images/ashwi/dressing_table.png</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
-<div class="item">
-    <img src="images/ashwi/dressingtable.png">
-    <p class="label">Dressing Table –  –  – Rs </p>
-    <p class="url-text">images/ashwi/dressingtable.png</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/ashwi/dressingtable.png">
+        <p class="label">Dressing Table –  –  – Rs </p>
+        <p class="url-text">images/ashwi/dressingtable.png</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
-<div class="item">
-    <img src="images/ashwi/mandir.png">
-    <p class="label">Mandir –  –  – Rs </p>
-    <p class="url-text">images/ashwi/mandir.png</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/ashwi/mandir.png">
+        <p class="label">Mandir –  –  – Rs </p>
+        <p class="url-text">images/ashwi/mandir.png</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
-<div class="item">
-    <img src="images/ashwi/wardrobe.png">
-    <p class="label">Wardrobe –  –  – Rs </p>
-    <p class="url-text">images/ashwi/wardrobe.png</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/ashwi/wardrobe.png">
+        <p class="label">Wardrobe –  –  – Rs </p>
+        <p class="url-text">images/ashwi/wardrobe.png</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
 </div>
 
@@ -121,19 +121,35 @@
 </div>
 
 <script>
+const BASE_URL = "https://simplesite1-taupe.vercel.app/";
+
 function copyURL(btn){
-    const url = btn.previousElementSibling.textContent;
+    const url = btn.previousElementSibling.textContent.trim();
     navigator.clipboard.writeText(url);
     alert("Copied: " + url);
 }
 
-document.querySelectorAll(".gallery img").forEach(img => {
+// Convert local paths → full Vercel URLs
+document.querySelectorAll(".item").forEach(item => {
+    const img = item.querySelector("img");
+    const urlText = item.querySelector(".url-text");
+
+    if (!img || !urlText) return;
+
+    const relativePath = img.getAttribute("src") || "";
+    const fullURL = BASE_URL + relativePath.replace(/^\//, "");
+
+    // update displayed URL
+    urlText.textContent = fullURL;
+
+    // update lightbox image
     img.onclick = () => {
         document.getElementById("lightbox").style.display = "flex";
-        document.getElementById("large").src = img.src;
+        document.getElementById("large").src = fullURL;
     };
 });
 
+// close lightbox
 document.getElementById("close").onclick = () =>
     document.getElementById("lightbox").style.display = "none";
 </script>
