@@ -58,10 +58,7 @@
             display:none; justify-content:center; align-items:center;
         }
 
-        #lightbox img {
-            max-width:90%;
-            max-height:90%;
-        }
+        #lightbox img { max-width:90%; max-height:90%; }
 
         #close {
             position:absolute;
@@ -79,12 +76,12 @@
 
 <div class="gallery">
 
-<div class="item">
-    <img src="images/dreamersmart19/dtg1_Smartwatch_Black_8499.jpeg">
-    <p class="label">Smartwatch – Dreamersmart – Black – Rs 8499</p>
-    <p class="url-text">images/dreamersmart19/dtg1_Smartwatch_Black_8499.jpeg</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/dreamersmart19/dtg1_Smartwatch_Black_8499.jpeg">
+        <p class="label">Smartwatch – Dreamersmart – Black – Rs 8499</p>
+        <p class="url-text">images/dreamersmart19/dtg1_Smartwatch_Black_8499.jpeg</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
 </div>
 
@@ -94,16 +91,26 @@
 </div>
 
 <script>
+const BASE_URL = "https://simplesite1-taupe.vercel.app/";
+
 function copyURL(btn){
-    const url = btn.previousElementSibling.textContent;
+    const url = btn.previousElementSibling.textContent.trim();
     navigator.clipboard.writeText(url);
     alert("Copied: " + url);
 }
 
-document.querySelectorAll(".gallery img").forEach(img => {
+document.querySelectorAll(".item").forEach(item => {
+    const img = item.querySelector("img");
+    const urlText = item.querySelector(".url-text");
+
+    const relativePath = img.getAttribute("src");
+    const fullURL = BASE_URL + relativePath.replace(/^\//, "");
+
+    urlText.textContent = fullURL;
+
     img.onclick = () => {
         document.getElementById("lightbox").style.display = "flex";
-        document.getElementById("large").src = img.src;
+        document.getElementById("large").src = fullURL;
     };
 });
 
