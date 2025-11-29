@@ -75,7 +75,6 @@
         .download-all-btn:hover {
             background: #005fcc;
         }
-
         .logo-upload {
             margin-bottom: 25px;
             padding: 15px;
@@ -84,7 +83,6 @@
         }
     </style>
 
-    <!-- JSZip for "Download All" ZIP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 
@@ -109,24 +107,35 @@
     </button>
 </div>
 
-
 <script>
+/* ------------------------------------
+   BASE URL for full image paths
+------------------------------------- */
+const BASE_URL = "https://simplesite1-taupe.vercel.app/";
+
+/* ====================================
+   GLOBAL VARIABLES
+===================================== */
 let logoImageURL = null;
 
-// ---------------- LOGO ----------------
+/* ====================================
+   LOGO UPLOAD HANDLER
+===================================== */
 document.getElementById("logoInput").onchange = function(e){
     const file = e.target.files[0];
-    if(file){
+    if (file) {
         logoImageURL = URL.createObjectURL(file);
     }
 };
 
-// -------------- IMAGE UPLOAD --------------
+/* ====================================
+   IMAGE UPLOAD HANDLER
+===================================== */
 document.getElementById("multiInput").onchange = function(e){
     const files = e.target.files;
     let html = "";
 
-    for(let i = 0; i < files.length; i++){
+    for (let i = 0; i < files.length; i++){
         const file = files[i];
         const url = URL.createObjectURL(file);
 
@@ -147,64 +156,54 @@ document.getElementById("multiInput").onchange = function(e){
             <button class="download-btn" onclick="createLabeledImage(this, ${i})">
                 Download Image
             </button>
-        </div>
-        `;
+        </div>`;
     }
 
     document.getElementById("formHolder").innerHTML = html;
 };
 
-
-// -------------- METADATA COLLECTOR --------------
+/* ====================================
+   METADATA COLLECTOR
+===================================== */
 function extractMetadata(block, file) {
-    const brand   = block.querySelector(".brand").value || "";
-    const item    = block.querySelector(".item").value || "";
-    const category= block.querySelector(".category").value || "";
-    const size    = block.querySelector(".size").value || "";
-    const price   = block.querySelector(".price").value || "";
-    const length  = block.querySelector(".length").value || "";
-    const width   = block.querySelector(".width").value || "";
-    const details = block.querySelector(".details").value || "";
-
     return {
         filename: file.name,
-        brand,
-        product: item,
-        category,
-        size,
-        price,
-        length,
-        width,
-        details,
+        brand: block.querySelector(".brand").value || "",
+        product: block.querySelector(".item").value || "",
+        category: block.querySelector(".category").value || "",
+        size: block.querySelector(".size").value || "",
+        price: block.querySelector(".price").value || "",
+        length: block.querySelector(".length").value || "",
+        width: block.querySelector(".width").value || "",
+        details: block.querySelector(".details").value || "",
         createdAt: new Date().toISOString()
     };
 }
 
-
-// -------------- SINGLE DOWNLOAD --------------
-async function createLabeledImage(button, index) {
-    const block = button.parentElement;
+/* ====================================
+   SINGLE DOWNLOAD BUTTON
+===================================== */
+async function createLabeledImage(btn, index) {
+    const block = btn.parentElement;
     const file = document.getElementById("multiInput").files[index];
-    if(!file) return;
+    if (!file) return;
 
     const meta = extractMetadata(block, file);
     const imgEl = block.querySelector("img.preview");
 
     const canvas = await generateLabeledCanvas(imgEl, meta);
     const dataURL = canvas.toDataURL("image/png");
-    const dataURLWithMeta = addMetadataToPngDataURL(dataURL, meta);
+    const pngWithMeta = addMetadataToPngDataURL(dataURL, meta);
 
-    downloadDataURL(dataURLWithMeta, "labeled_" + file.name + ".png");
+    downloadDataURL(pngWithMeta, "labeled_" + file.name + ".png");
 }
 
-
-// -------------- DOWNLOAD ALL (ZIP) --------------
-document.getElementById("downloadAllBtn").onclick = async function () {
+/* ====================================
+   DOWNLOAD ALL (ZIP)
+===================================== */
+document.getElementById("downloadAllBtn").onclick = async function() {
     const files = document.getElementById("multiInput").files;
-    if (!files.length) {
-        alert("Please upload images first.");
-        return;
-    }
+    if (!files.length) return alert("Upload images first!");
 
     const blocks = document.querySelectorAll(".image-block");
     const zip = new JSZip();
@@ -213,136 +212,130 @@ document.getElementById("downloadAllBtn").onclick = async function () {
         extractMetadata(blocks[idx], file)
     );
 
-    const canvasList = await Promise.all(
+    const canvases = await Promise.all(
         metaList.map((meta, idx) => {
             const imgEl = blocks[idx].querySelector("img.preview");
             return generateLabeledCanvas(imgEl, meta);
         })
     );
 
-    canvasList.forEach((canvas, idx) => {
+    canvases.forEach((canvas, idx) => {
         const meta = metaList[idx];
         const file = files[idx];
+
         const dataURL = canvas.toDataURL("image/png");
-        const dataURLWithMeta = addMetadataToPngDataURL(dataURL, meta);
-        const base64Data = dataURLWithMeta.split(",")[1];
-        zip.file("labeled_" + file.name + ".png", base64Data, { base64: true });
+        const finalURL = addMetadataToPngDataURL(dataURL, meta);
+        const base64 = finalURL.split(",")[1];
+
+        zip.file("labeled_" + file.name + ".png", base64, { base64: true });
     });
 
-    const zipBlob = await zip.generateAsync({ type: "blob" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(zipBlob);
-    link.download = "labeled_images.zip";
-    link.click();
+    const blob = await zip.generateAsync({ type: "blob" });
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "labeled_images.zip";
+    a.click();
 };
 
-
-// -------------- CANVAS GENERATION --------------
+/* ====================================
+   CANVAS GENERATION
+   (FULL URL FIX INCLUDED)
+===================================== */
 function generateLabeledCanvas(imgEl, meta) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
         const baseImage = new Image();
         baseImage.crossOrigin = "anonymous";
-        baseImage.src = imgEl.src;
+
+        const source = imgEl.src;
+
+        baseImage.src = source.startsWith("blob:")
+            ? source
+            : BASE_URL + source.replace(/^\//, "");
 
         baseImage.onload = function() {
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
 
-            const w = baseImage.width;
-            const h = baseImage.height;
+            canvas.width = baseImage.width;
+            canvas.height = baseImage.height;
 
-            canvas.width = w;
-            canvas.height = h;
+            ctx.drawImage(baseImage, 0, 0);
 
-            ctx.drawImage(baseImage, 0, 0, w, h);
+            if (logoImageURL) {
+                const logo = new Image();
+                logo.crossOrigin = "anonymous";
+                logo.src = logoImageURL;
 
-            // draw logo first (top-left)
-            const drawLogoAndBox = () => {
-                if (logoImageURL) {
-                    const logo = new Image();
-                    logo.crossOrigin = "anonymous";
-                    logo.src = logoImageURL;
-                    logo.onload = function() {
-                        const logoW = w * 0.16;
-                        const logoH = logo.height * (logoW / logo.width);
-                        ctx.drawImage(logo, 40, 40, logoW, logoH);
-                        drawTextBox(canvas, ctx, w, h, meta);
-                        resolve(canvas);
-                    };
-                } else {
-                    drawTextBox(canvas, ctx, w, h, meta);
+                logo.onload = function() {
+                    const logoW = canvas.width * 0.16;
+                    const logoH = logo.height * (logoW / logo.width);
+
+                    ctx.drawImage(logo, 40, 40, logoW, logoH);
+                    drawTextBox(canvas, ctx, canvas.width, canvas.height, meta);
                     resolve(canvas);
-                }
-            };
-
-            drawLogoAndBox();
+                };
+            } else {
+                drawTextBox(canvas, ctx, canvas.width, canvas.height, meta);
+                resolve(canvas);
+            }
         };
     });
 }
 
-
-// -------------- TEXT BOX (RIGHT SIDE, SMART WRAP) --------------
+/* ====================================
+   TEXT BOX DRAWING
+===================================== */
 function drawTextBox(canvas, ctx, w, h, meta) {
-    // base logical lines
-    const baseLines = [];
-
-    if (meta.brand)   baseLines.push(meta.brand);
-    if (meta.product) baseLines.push(meta.product);
-    if (meta.category)baseLines.push(meta.category);
-    if (meta.size)    baseLines.push("Size – " + meta.size);
-    if (meta.price)   baseLines.push("Price – Rs " + meta.price);
-    if (meta.length)  baseLines.push("Length – " + meta.length);
-    if (meta.width)   baseLines.push("Width – " + meta.width);
-
-    if (meta.details) {
-        baseLines.push(""); // blank line between specs & paragraph
-        const detailLines = meta.details.split(/\r?\n/);
-        detailLines.forEach(l => {
-            if (l.trim()) baseLines.push(l.trim());
-        });
-    }
-
     const paddingX = 25;
     const paddingY = 30;
 
-    // font size scales with image width
+    const lines = [];
+    if (meta.brand) lines.push(meta.brand);
+    if (meta.product) lines.push(meta.product);
+    if (meta.category) lines.push(meta.category);
+    if (meta.size) lines.push("Size – " + meta.size);
+    if (meta.price) lines.push("Price – Rs " + meta.price);
+    if (meta.length) lines.push("Length – " + meta.length);
+    if (meta.width) lines.push("Width – " + meta.width);
+
+    if (meta.details) {
+        lines.push("");
+        meta.details.split("\n").forEach(l => lines.push(l.trim()));
+    }
+
     const fontSize = Math.max(18, Math.round(w * 0.023));
     ctx.font = "bold " + fontSize + "px Arial";
 
     const boxWidth = Math.min(w * 0.38, 520);
-    const textMaxWidth = boxWidth - paddingX * 2;
+    const textMax = boxWidth - paddingX * 2;
 
-    // word-wrap lines
-    const wrappedLines = [];
-    baseLines.forEach(line => {
-        if (line === "") {
-            wrappedLines.push(""); // keep blank line
+    const wrapped = [];
+    lines.forEach(line => {
+        if (!line) {
+            wrapped.push("");
         } else {
-            const parts = wrapText(ctx, line, textMaxWidth);
-            wrappedLines.push(...parts);
+            wrapped.push(...wrapText(ctx, line, textMax));
         }
     });
 
     const lineHeight = fontSize + 8;
-    const boxHeight = paddingY * 2 + lineHeight * wrappedLines.length;
+    const boxHeight = paddingY * 2 + wrapped.length * lineHeight;
 
-    // RIGHT SIDE placement
     const boxX = w - boxWidth - 40;
     const boxY = h - boxHeight - 40;
 
-    // transparent rounded box
-    ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
     ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
     ctx.fill();
 
-    // text
     ctx.fillStyle = "black";
     ctx.font = "bold " + fontSize + "px Arial";
-    let y = boxY + paddingY + fontSize;
 
-    wrappedLines.forEach(line => {
+    let y = boxY + paddingY + fontSize;
+    wrapped.forEach(line => {
         if (line === "") {
-            y += lineHeight; // blank line spacing
+            y += lineHeight;
         } else {
             ctx.fillText(line, boxX + paddingX, y);
             y += lineHeight;
@@ -350,131 +343,108 @@ function drawTextBox(canvas, ctx, w, h, meta) {
     });
 }
 
-
-// simple word-wrap helper
+/* ====================================
+   WORD WRAP HELPER
+===================================== */
 function wrapText(ctx, text, maxWidth) {
     const words = text.split(/\s+/);
     const lines = [];
     let line = "";
 
-    words.forEach(word => {
+    for (let word of words) {
         const test = line ? line + " " + word : word;
-        const width = ctx.measureText(test).width;
-        if (width > maxWidth && line) {
+        if (ctx.measureText(test).width > maxWidth && line) {
             lines.push(line);
             line = word;
         } else {
             line = test;
         }
-    });
+    }
 
     if (line) lines.push(line);
     return lines;
 }
 
-
-// -------------- DATA URL DOWNLOAD --------------
+/* ====================================
+   DOWNLOAD HELPER
+===================================== */
 function downloadDataURL(dataURL, filename) {
-    const link = document.createElement("a");
-    link.download = filename;
-    link.href = dataURL;
-    link.click();
+    const a = document.createElement("a");
+    a.download = filename;
+    a.href = dataURL;
+    a.click();
 }
 
-
-// -------------- PNG METADATA (tEXt chunk, JSON) --------------
+/* ====================================
+   PNG METADATA (UNCHANGED)
+===================================== */
 function addMetadataToPngDataURL(dataURL, metadata) {
     try {
         const json = JSON.stringify(metadata);
-
         const base64 = dataURL.split(",")[1];
         const binary = atob(base64);
         const len = binary.length;
         const bytes = new Uint8Array(len);
 
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binary.charCodeAt(i);
-        }
+        for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
 
-        // find IEND chunk
-        let offset = 8; // after PNG signature
-        let iendIndex = -1;
+        let offset = 8, iendIndex = -1;
 
         while (offset < bytes.length) {
             const length = readUint32(bytes, offset);
             const type = readType(bytes, offset + 4);
-
-            if (type === "IEND") {
-                iendIndex = offset;
-                break;
-            }
-            offset += 8 + length + 4; // len(4) + type(4) + data + crc(4)
+            if (type === "IEND") { iendIndex = offset; break; }
+            offset += 8 + length + 4;
         }
 
-        if (iendIndex < 0) {
-            return dataURL; // invalid PNG
-        }
+        if (iendIndex < 0) return dataURL;
 
         const keyword = "label_metadata";
         const text = keyword + "\0" + json;
-        const encoder = new TextEncoder();
-        const textBytes = encoder.encode(text);
+        const textBytes = new TextEncoder().encode(text);
 
-        const chunkTypeBytes = stringToBytes("tEXt");
+        const chunkType = stringToBytes("tEXt");
         const lengthBytes = uint32ToBytes(textBytes.length);
 
-        const crcInput = new Uint8Array(chunkTypeBytes.length + textBytes.length);
-        crcInput.set(chunkTypeBytes, 0);
-        crcInput.set(textBytes, chunkTypeBytes.length);
+        const crcInput = new Uint8Array(chunkType.length + textBytes.length);
+        crcInput.set(chunkType, 0);
+        crcInput.set(textBytes, chunkType.length);
 
         const crcVal = crc32(crcInput);
         const crcBytes = uint32ToBytes(crcVal);
 
         const newChunk = new Uint8Array(4 + 4 + textBytes.length + 4);
         newChunk.set(lengthBytes, 0);
-        newChunk.set(chunkTypeBytes, 4);
+        newChunk.set(chunkType, 4);
         newChunk.set(textBytes, 8);
         newChunk.set(crcBytes, 8 + textBytes.length);
 
         const before = bytes.subarray(0, iendIndex);
         const after = bytes.subarray(iendIndex);
 
-        const out = new Uint8Array(before.length + newChunk.length + after.length);
-        out.set(before, 0);
-        out.set(newChunk, before.length);
-        out.set(after, before.length + newChunk.length);
+        const output = new Uint8Array(before.length + newChunk.length + after.length);
+        output.set(before, 0);
+        output.set(newChunk, before.length);
+        output.set(after, before.length + newChunk.length);
 
         let outBinary = "";
-        for (let i = 0; i < out.length; i++) {
-            outBinary += String.fromCharCode(out[i]);
-        }
-        const outBase64 = btoa(outBinary);
-        return "data:image/png;base64," + outBase64;
-    } catch (e) {
-        console.error("Metadata embedding failed:", e);
+        for (let i = 0; i < output.length; i++)
+            outBinary += String.fromCharCode(output[i]);
+
+        return "data:image/png;base64," + btoa(outBinary);
+    } catch (err) {
+        console.error("Metadata embedding failed:", err);
         return dataURL;
     }
 }
 
-// helpers for PNG parsing
-function readUint32(bytes, offset) {
-    return (
-        (bytes[offset] << 24) |
-        (bytes[offset + 1] << 16) |
-        (bytes[offset + 2] << 8) |
-        (bytes[offset + 3])
-    ) >>> 0;
+/* PNG HELPERS */
+function readUint32(b, o) {
+    return ((b[o] << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]) >>> 0;
 }
-
-function readType(bytes, offset) {
-    return String.fromCharCode(
-        bytes[offset],
-        bytes[offset + 1],
-        bytes[offset + 2],
-        bytes[offset + 3]
-    );
+function readType(b, o) {
+    return String.fromCharCode(b[o], b[o+1], b[o+2], b[o+3]);
 }
-
 function uint32ToBytes(num) {
     return new Uint8Array([
         (num >>> 24) & 255,
@@ -483,31 +453,23 @@ function uint32ToBytes(num) {
         num & 255
     ]);
 }
-
 function stringToBytes(str) {
-    const arr = new Uint8Array(str.length);
-    for (let i = 0; i < str.length; i++) {
-        arr[i] = str.charCodeAt(i);
-    }
-    return arr;
+    return new Uint8Array([...str].map(c => c.charCodeAt(0)));
 }
 
-// CRC32 for PNG chunks
 let crcTable = null;
-function makeCrcTable() {
-    let c;
-    crcTable = [];
-    for (let n = 0; n < 256; n++) {
-        c = n;
-        for (let k = 0; k < 8; k++) {
-            c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-        }
-        crcTable[n] = c >>> 0;
-    }
-}
-
 function crc32(arr) {
-    if (!crcTable) makeCrcTable();
+    if (!crcTable) {
+        crcTable = [];
+        for (let i = 0; i < 256; i++) {
+            let c = i;
+            for (let k = 0; k < 8; k++) {
+                c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            }
+            crcTable[i] = c >>> 0;
+        }
+    }
+
     let crc = 0 ^ (-1);
     for (let i = 0; i < arr.length; i++) {
         crc = (crc >>> 8) ^ crcTable[(crc ^ arr[i]) & 0xFF];
@@ -515,17 +477,16 @@ function crc32(arr) {
     return (crc ^ (-1)) >>> 0;
 }
 
-
-// -------------- ROUNDED RECTANGLE --------------
+/* Rounded rectangle support */
 CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     if (w < 2 * r) r = w / 2;
     if (h < 2 * r) r = h / 2;
     this.beginPath();
-    this.moveTo(x + r, y);
-    this.arcTo(x + w, y,   x + w, y + h, r);
-    this.arcTo(x + w, y + h, x,   y + h, r);
-    this.arcTo(x,   y + h, x,   y,   r);
-    this.arcTo(x,   y,   x + w, y,   r);
+    this.moveTo(x+r, y);
+    this.arcTo(x+w, y,   x+w, y+h, r);
+    this.arcTo(x+w, y+h, x,   y+h, r);
+    this.arcTo(x,   y+h, x,   y,   r);
+    this.arcTo(x,   y,   x+w, y,   r);
     this.closePath();
     return this;
 };
