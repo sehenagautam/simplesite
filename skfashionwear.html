@@ -5,15 +5,21 @@
     <title>SK Fashion Wear</title>
 
     <style>
-        body { font-family: Arial; padding: 20px; background:#f5f5f5; }
-        h1 { text-align: center; font-size: 30px; margin-bottom: 25px; }
-
+        body {
+            font-family: Arial; 
+            padding: 20px; 
+            background:#f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            font-size: 30px;
+            margin-bottom: 25px;
+        }
         .gallery {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 20px;
         }
-
         .item {
             background: white;
             padding: 12px;
@@ -21,25 +27,21 @@
             text-align: center;
             box-shadow: 0 3px 6px rgba(0,0,0,0.1);
         }
-
         .item img {
             width: 100%;
             border-radius: 8px;
             cursor: pointer;
         }
-
         .label {
             margin-top: 10px;
             font-weight: bold;
             font-size: 15px;
         }
-
         .url-text {
             font-size: 12px;
             margin-top: 5px;
             word-break: break-all;
         }
-
         .copy-btn {
             margin-top: 8px;
             padding: 6px 10px;
@@ -50,7 +52,6 @@
             border-radius: 4px;
             cursor: pointer;
         }
-
         #lightbox {
             position: fixed; top:0; left:0;
             width:100%; height:100%;
@@ -60,8 +61,11 @@
         #lightbox img { max-width:90%; max-height:90%; }
 
         #close {
-            position:absolute; top:20px; right:30px;
-            font-size:40px; color:white; cursor:pointer;
+            position:absolute; 
+            top:20px; right:30px;
+            font-size:40px; 
+            color:white; 
+            cursor:pointer;
         }
     </style>
 
@@ -72,29 +76,26 @@
 
 <div class="gallery">
 
-<!-- Jacket Rs 2700 -->
-<div class="item">
-    <img src="images/skfashionwear/jacket_Rs2700.jpeg">
-    <p class="label">Jacket – Rs 2700</p>
-    <p class="url-text">images/skfashionwear/jacket_Rs2700.jpeg</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/skfashionwear/jacket_Rs2700.jpeg">
+        <p class="label">Jacket – Rs 2700</p>
+        <p class="url-text">images/skfashionwear/jacket_Rs2700.jpeg</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
-<!-- Hoodie Rs 1850 -->
-<div class="item">
-    <img src="images/skfashionwear/hoodie_Rs1850.jpeg">
-    <p class="label">Hoodie – Rs 1850</p>
-    <p class="url-text">images/skfashionwear/hoodie_Rs1850.jpeg</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/skfashionwear/hoodie_Rs1850.jpeg">
+        <p class="label">Hoodie – Rs 1850</p>
+        <p class="url-text">images/skfashionwear/hoodie_Rs1850.jpeg</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
-<!-- Black Jacket Rs 2200 -->
-<div class="item">
-    <img src="images/skfashionwear/blackJacket_Rs2200.jpg">
-    <p class="label">Black Jacket – Rs 2200</p>
-    <p class="url-text">images/skfashionwear/blackJacket_Rs2200.jpg</p>
-    <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
-</div>
+    <div class="item">
+        <img src="images/skfashionwear/blackJacket_Rs2200.jpg">
+        <p class="label">Black Jacket – Rs 2200</p>
+        <p class="url-text">images/skfashionwear/blackJacket_Rs2200.jpg</p>
+        <button class="copy-btn" onclick="copyURL(this)">Copy URL</button>
+    </div>
 
 </div>
 
@@ -104,16 +105,26 @@
 </div>
 
 <script>
+const BASE_URL = "https://simplesite1-taupe.vercel.app/";
+
 function copyURL(btn){
-    const url = btn.previousElementSibling.textContent;
+    const url = btn.previousElementSibling.textContent.trim();
     navigator.clipboard.writeText(url);
     alert("Copied: " + url);
 }
 
-document.querySelectorAll(".gallery img").forEach(img => {
+document.querySelectorAll(".item").forEach(item => {
+    const img = item.querySelector("img");
+    const urlText = item.querySelector(".url-text");
+
+    const relativePath = img.getAttribute("src");
+    const fullURL = BASE_URL + relativePath.replace(/^\//, "");
+
+    urlText.textContent = fullURL;
+
     img.onclick = () => {
         document.getElementById("lightbox").style.display = "flex";
-        document.getElementById("large").src = img.src;
+        document.getElementById("large").src = fullURL;
     };
 });
 
